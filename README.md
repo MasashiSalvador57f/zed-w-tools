@@ -7,12 +7,43 @@ Rust で書かれ、WebAssembly (`wasm32-wasip2`) にコンパイルされて Ze
 
 ```
 zed-w-tools/
-├── extension.toml       # 拡張のメタデータ（id / name / version など）
+├── extension.toml       # 拡張のメタデータ（id / name / version / slash command 宣言）
 ├── Cargo.toml           # Rust クレート設定（cdylib としてビルド）
 ├── rust-toolchain.toml  # rustup 利用時に wasm32-wasip2 ターゲットを自動導入
-└── src/
-    └── lib.rs           # 拡張のエントリポイント（zed::Extension の実装）
+├── src/
+│   └── lib.rs           # 拡張のエントリポイント（zed::Extension の実装）
+└── scripts/
+    └── tategaki_preview.py  # 縦書きプレビュー HTML 生成スクリプト（lib.rs から include_str! で埋め込み）
 ```
+
+## 機能
+
+### `/tategaki-preview` — 日本語テキストの縦書きプレビュー
+
+Assistant パネルのスラッシュコマンドとして提供します。
+指定したテキストファイルを縦書きレイアウトの HTML に変換し、ブラウザで開きます。
+
+```
+/tategaki-preview <ファイル> [chars=40] [spacing=1.75] [lines=30] [font_size=16] [margin=15]
+```
+
+- ファイルパスはワークツリーからの相対パス、または絶対パス
+- `chars`: 1行あたりの文字数（既定: 40）
+- `spacing`: 行間（文字サイズ比、既定: 1.75）
+- `lines`: 1ページあたりの行数（既定: 30）
+- `font_size`: 文字サイズ px（既定: 16）
+- `margin`: 余白 mm（既定: 15。A4 横の全周余白。印刷時の実効最小値は約 14mm — ブラウザの最小印刷余白のため）
+
+プレビュー画面上部のコントロールバーから各値をリアルタイムに変更でき、
+「PDF出力」ボタンで A4 横サイズへの印刷（PDF保存）が可能です。
+
+対応するカクヨム記法:
+
+- `｜漢字《かんじ》` — 明示的なルビ
+- `漢字《かんじ》` — 直前の漢字の連なりへのルビ
+- `《《傍点》》` — 傍点（sesame dots）
+
+実行には `python3` が必要です（PATH 上にあるものを自動検出します）。
 
 ## 開発環境の前提
 

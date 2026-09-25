@@ -5,3 +5,7 @@ schema_version = 1
 authors = ["Masashi SALVADOR Mitsuzawa <masashisalvador57f@gmail.com>"]
 description = "A Zed extension providing developer tools."
 repository = "https://github.com/MasashiSalvador57f/zed-w-tools"
+
+[slash_commands.tategaki-preview]
+description = "テキストファイルを縦書きプレビュー（カクヨム記法ルビ対応・A4横PDF出力可）でブラウザに開きます。usage: /tategaki-preview <file> [chars=40] [spacing=1.75] [lines=30] [font_size=16] [margin=15]"
+requires_argument = true
