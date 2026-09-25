@@ -2,7 +2,7 @@
 """Generate and open a vertical-writing (tategaki) HTML preview.
 
 Usage:
-    python3 tategaki_preview.py <source.txt> [chars_per_line] [line_spacing] [lines_per_page] [font_size_px]
+    python3 tategaki_preview.py <source.txt> [chars_per_line] [line_spacing] [lines_per_page] [font_size_px] [margin_mm]
 
 Reads the source text, embeds it in a self-contained HTML file (vertical
 writing, Kakuyomu ruby notation support, A4-landscape print layout),
@@ -21,11 +21,13 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <title>縦書きプレビュー</title>
+<style id="pagestyle"></style>
 <style>
 :root {
   --font-size: 16px;
   --spacing: 1.75;
   --chars: 40;
+  --margin: 15mm;
 }
 body {
   margin: 0;
@@ -52,8 +54,8 @@ body {
 #warning { color: #b00; display: none; }
 #pages { padding: 76px 0 48px; }
 .page {
-  width: 277mm;
-  height: 180mm;
+  width: calc(297mm - var(--margin) * 2);
+  height: calc(210mm - var(--margin) * 2);
   background: #fff;
   margin: 0 auto 28px;
   box-shadow: 0 2px 10px rgba(0,0,0,.3);
@@ -87,10 +89,11 @@ rt { font-size: .52em; line-height: 1; }
   #controls { display: none; }
   body { background: #fff; }
   #pages { padding: 0; }
-  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; height: 179.5mm; }
+  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; height: calc(210mm - var(--margin) * 2 - 0.5mm); }
   .page:last-child { page-break-after: avoid; }
 }
-@page { size: A4 landscape; margin: 15mm 10mm; }
+/* @page margin is rewritten by JS; this is the initial value. */
+@page { size: A4 landscape; margin: 15mm; }
 </style>
 </head>
 <body>
@@ -100,6 +103,7 @@ rt { font-size: .52em; line-height: 1; }
   <label>行間(文字サイズ比) <input id="in-spacing" type="number" step="0.05" min="1"></label>
   <label>1ページ行数 <input id="in-lines" type="number" min="1"></label>
   <label>文字サイズ(px) <input id="in-fontsize" type="number" min="8"></label>
+  <label>余白(mm) <input id="in-margin" type="number" min="0"></label>
   <button id="btn-pdf">PDF出力 (A4横)</button>
   <span id="warning">内容がページに収まりきらない可能性があります（文字サイズ/行数を調整してください）</span>
 </div>
@@ -136,11 +140,15 @@ function render() {
   const spacing = Math.max(1, parseFloat(document.getElementById("in-spacing").value) || 1);
   const linesPerPage = Math.max(1, parseInt(document.getElementById("in-lines").value, 10) || 1);
   const fontSize = Math.max(8, parseInt(document.getElementById("in-fontsize").value, 10) || 8);
+  const marginMm = Math.max(0, parseInt(document.getElementById("in-margin").value, 10) || 0);
 
   const root = document.documentElement;
   root.style.setProperty("--chars", chars);
   root.style.setProperty("--spacing", spacing);
   root.style.setProperty("--font-size", fontSize + "px");
+  root.style.setProperty("--margin", marginMm + "mm");
+  document.getElementById("pagestyle").textContent =
+    `@page { size: A4 landscape; margin: ${marginMm}mm; }`;
 
   // Columnize: a column holds at most `chars` cells; newline ends the column.
   const atoms = parse(SOURCE);
@@ -200,8 +208,8 @@ function render() {
     pagesEl.appendChild(pageEl);
   }
 
-  // Warn if a column is taller than the printable page height (180mm).
-  const pageHpx = 180 * 3.7795;
+  // Warn if a column is taller than the printable page height.
+  const pageHpx = (210 - marginMm * 2) * 3.7795;
   document.getElementById("warning").style.display =
     chars * fontSize > pageHpx ? "inline" : "none";
 }
@@ -209,7 +217,8 @@ function render() {
 const params = PARAMS;
 document.getElementById("filename").textContent = params.name || "";
 for (const [id, v] of [["in-chars", params.chars], ["in-spacing", params.spacing],
-                       ["in-lines", params.lines], ["in-fontsize", params.fontSize]]) {
+                       ["in-lines", params.lines], ["in-fontsize", params.fontSize],
+                       ["in-margin", params.margin]]) {
   const el = document.getElementById(id);
   el.value = v;
   el.addEventListener("input", render);
@@ -230,6 +239,7 @@ def main():
     spacing = float(sys.argv[3]) if len(sys.argv) > 3 else 1.75
     lines = int(sys.argv[4]) if len(sys.argv) > 4 else 30
     font_size = int(sys.argv[5]) if len(sys.argv) > 5 else 16
+    margin_mm = int(sys.argv[6]) if len(sys.argv) > 6 else 15
 
     with open(src, encoding="utf-8") as f:
         text = f.read()
@@ -240,6 +250,7 @@ def main():
         "spacing": spacing,
         "lines": lines,
         "fontSize": font_size,
+        "margin": margin_mm,
     }
     # Escape '<' so the serialized text can never close the inline <script>.
     source_json = json.dumps(text, ensure_ascii=False).replace("<", "\\u003c")

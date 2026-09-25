@@ -3,7 +3,8 @@ use zed_extension_api as zed;
 const PREVIEW_SCRIPT: &str = include_str!("../scripts/tategaki_preview.py");
 const COMMAND_NAME: &str = "tategaki-preview";
 
-const USAGE: &str = "usage: /tategaki-preview <file> [chars=40] [spacing=1.75] [lines=30] [font_size=16]";
+const USAGE: &str =
+    "usage: /tategaki-preview <file> [chars=40] [spacing=1.75] [lines=30] [font_size=16] [margin=15]";
 
 /// Entry point of the `w-tools` extension.
 struct WToolsExtension;
@@ -13,6 +14,7 @@ struct PreviewOptions {
     spacing: String,
     lines: String,
     font_size: String,
+    margin: String,
 }
 
 fn parse_options(args: &[String]) -> Result<PreviewOptions, String> {
@@ -21,6 +23,7 @@ fn parse_options(args: &[String]) -> Result<PreviewOptions, String> {
         spacing: "1.75".into(),
         lines: "30".into(),
         font_size: "16".into(),
+        margin: "15".into(),
     };
     for arg in args {
         let Some((key, value)) = arg.split_once('=') else {
@@ -31,6 +34,7 @@ fn parse_options(args: &[String]) -> Result<PreviewOptions, String> {
             "spacing" => &mut opts.spacing,
             "lines" => &mut opts.lines,
             "font_size" => &mut opts.font_size,
+            "margin" => &mut opts.margin,
             _ => return Err(format!("unknown option `{key}`\n{USAGE}")),
         };
         *target = value.to_string();
@@ -90,6 +94,7 @@ impl zed::Extension for WToolsExtension {
             .arg(opts.spacing)
             .arg(opts.lines)
             .arg(opts.font_size)
+            .arg(opts.margin)
             .output()
             .map_err(|e| format!("failed to run python: {e}"))?;
 
