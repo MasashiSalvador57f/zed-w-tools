@@ -1,0 +1,7 @@
+id = "w-tools"
+name = "W Tools"
+version = "0.0.1"
+schema_version = 1
+authors = ["Masashi SALVADOR Mitsuzawa <masashisalvador57f@gmail.com>"]
+description = "A Zed extension providing developer tools."
+repository = "https://github.com/MasashiSalvador57f/zed-w-tools"
