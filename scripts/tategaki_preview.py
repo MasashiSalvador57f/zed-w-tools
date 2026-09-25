@@ -89,7 +89,8 @@ rt { font-size: .52em; line-height: 1; }
   #controls { display: none; }
   body { background: #fff; }
   #pages { padding: 0; }
-  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; height: calc(210mm - var(--margin) * 2 - 0.5mm); }
+  /* Chrome enforces a minimum printable margin even when @page margin is 0; shave extra. */
+  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; height: calc(210mm - var(--margin) * 2 - 4mm); width: calc(297mm - var(--margin) * 2 - 4mm); }
   .page:last-child { page-break-after: avoid; }
 }
 /* @page margin is rewritten by JS; this is the initial value. */
@@ -141,14 +142,16 @@ function render() {
   const linesPerPage = Math.max(1, parseInt(document.getElementById("in-lines").value, 10) || 1);
   const fontSize = Math.max(8, parseInt(document.getElementById("in-fontsize").value, 10) || 8);
   const marginMm = Math.max(0, parseInt(document.getElementById("in-margin").value, 10) || 0);
+  // Chrome falls back to ~1in margins when @page margin is too small; clamp the effective margin.
+  const effMm = Math.max(marginMm, 14);
 
   const root = document.documentElement;
   root.style.setProperty("--chars", chars);
   root.style.setProperty("--spacing", spacing);
   root.style.setProperty("--font-size", fontSize + "px");
-  root.style.setProperty("--margin", marginMm + "mm");
+  root.style.setProperty("--margin", effMm + "mm");
   document.getElementById("pagestyle").textContent =
-    `@page { size: A4 landscape; margin: ${marginMm}mm; }`;
+    `@page { size: A4 landscape; margin: ${effMm}mm; }`;
 
   // Columnize: a column holds at most `chars` cells; newline ends the column.
   const atoms = parse(SOURCE);
@@ -209,7 +212,7 @@ function render() {
   }
 
   // Warn if a column is taller than the printable page height.
-  const pageHpx = (210 - marginMm * 2) * 3.7795;
+  const pageHpx = (210 - effMm * 2) * 3.7795;
   document.getElementById("warning").style.display =
     chars * fontSize > pageHpx ? "inline" : "none";
 }
