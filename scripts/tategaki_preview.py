@@ -150,9 +150,20 @@ function render() {
   const flush = () => { cols.push(col); col = []; cells = 0; };
   for (const a of atoms) {
     if (a.t === "br") { flush(); continue; }
-    const n = a.t === "ruby" ? a.base.length : 1;
-    if (cells + n > chars && cells > 0) flush();
-    col.push(a); cells += n;
+    if (a.t === "ruby") {
+      // Split oversized ruby bases across columns; the reading stays on the first segment.
+      let base = a.base, rt = a.rt;
+      while (base.length) {
+        if (cells >= chars) flush();
+        const take = Math.min(chars - cells, base.length);
+        col.push({t:"ruby", base: base.slice(0, take), rt});
+        rt = "";
+        cells += take; base = base.slice(take);
+      }
+      continue;
+    }
+    if (cells >= chars) flush();
+    col.push(a); cells++;
   }
   if (col.length || cols.length === 0) flush();
 
@@ -230,16 +241,18 @@ def main():
         "lines": lines,
         "fontSize": font_size,
     }
-    html = (
-        TEMPLATE
-        .replace("%%SOURCE_JSON%%", json.dumps(text, ensure_ascii=False))
-        .replace("%%PARAMS_JSON%%", json.dumps(params))
+    # Escape '<' so the serialized text can never close the inline <script>.
+    source_json = json.dumps(text, ensure_ascii=False).replace("<", "\\u003c")
+    # Replace PARAMS first: source text must never be scanned for placeholders.
+    html = TEMPLATE.replace("%%PARAMS_JSON%%", json.dumps(params)).replace(
+        "%%SOURCE_JSON%%", source_json
     )
 
     out_dir = os.path.join(tempfile.gettempdir(), "tategaki-preview")
     os.makedirs(out_dir, exist_ok=True)
-    out = os.path.join(out_dir, os.path.splitext(params["name"])[0] + ".html")
-    with open(out, "w", encoding="utf-8") as f:
+    stem = os.path.splitext(params["name"])[0]
+    fd, out = tempfile.mkstemp(dir=out_dir, prefix=stem + "-", suffix=".html")
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(html)
 
     print(out)

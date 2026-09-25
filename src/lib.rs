@@ -60,6 +60,10 @@ impl zed::Extension for WToolsExtension {
         let opts = parse_options(&args[1..])?;
         let worktree = worktree.ok_or("this command must be run inside a worktree")?;
 
+        if !file.starts_with('/') && file.split('/').any(|part| part == "..") {
+            return Err("`..` path components are not allowed".into());
+        }
+
         let root = worktree.root_path();
         let abs_src = if file.starts_with('/') {
             file.clone()
