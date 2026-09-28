@@ -55,8 +55,9 @@ body {
 #warning { color: #b00; display: none; }
 #pages { padding: 76px 0 48px; }
 .page {
-  width: calc(297mm - var(--margin-x) * 2);
-  height: calc(210mm - var(--margin-y) * 2);
+  width: 297mm;
+  height: 210mm;
+  padding: var(--margin-y) var(--margin-x);
   background: #fff;
   margin: 0 auto 28px;
   box-shadow: 0 2px 10px rgba(0,0,0,.3);
@@ -91,7 +92,7 @@ rt { font-size: .52em; line-height: 1; }
   body { background: #fff; }
   #pages { padding: 0; }
   /* Chrome enforces a minimum printable margin even when @page margin is 0; shave extra. */
-  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; height: calc(210mm - var(--margin-y) * 2 - 4mm); width: calc(297mm - var(--margin-x) * 2 - 4mm); }
+  .page { margin: 0; box-shadow: none; page-break-after: always; overflow: hidden; padding: 0; height: calc(210mm - var(--margin-y) * 2 - 4mm); width: calc(297mm - var(--margin-x) * 2 - 4mm); }
   .page:last-child { page-break-after: avoid; }
 }
 /* @page margin is rewritten by JS; this is the initial value. */
