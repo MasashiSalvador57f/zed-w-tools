@@ -218,13 +218,25 @@ function render() {
 }
 
 const params = PARAMS;
+const STORAGE_KEY = "tategaki-preview-settings";
+let saved = {};
+try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch (e) {}
 document.getElementById("filename").textContent = params.name || "";
-for (const [id, v] of [["in-chars", params.chars], ["in-spacing", params.spacing],
-                       ["in-lines", params.lines], ["in-fontsize", params.fontSize],
-                       ["in-margin", params.margin]]) {
+const fields = [["in-chars", "chars"], ["in-spacing", "spacing"],
+                ["in-lines", "lines"], ["in-fontsize", "fontSize"],
+                ["in-margin", "margin"]];
+for (const [id, key] of fields) {
   const el = document.getElementById(id);
-  el.value = v;
-  el.addEventListener("input", render);
+  el.value = saved[key] !== undefined ? saved[key] : params[key];
+  el.addEventListener("input", () => {
+    const values = {};
+    for (const [fid, fkey] of fields) {
+      const v = parseFloat(document.getElementById(fid).value);
+      if (isFinite(v)) values[fkey] = v;
+    }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(values)); } catch (e) {}
+    render();
+  });
 }
 document.getElementById("btn-pdf").addEventListener("click", () => window.print());
 render();
