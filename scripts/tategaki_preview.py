@@ -62,7 +62,7 @@ body {
   display: flex;
   flex-direction: row-reverse;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   box-sizing: border-box;
   position: relative;
 }
