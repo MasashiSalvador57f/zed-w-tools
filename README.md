@@ -80,6 +80,16 @@ cargo check
 cargo build --release --target wasm32-wasip2
 ```
 
+## リリース
+
+`v*` 形式のタグを push すると GitHub Actions が `extension.wasm` をビルドし、
+自動で GitHub Release に添付します。
+
+```sh
+git tag v0.0.1
+git push origin v0.0.1
+```
+
 ## 参考
 
 - [Developing Extensions - Zed Docs](https://zed.dev/docs/extensions/developing-extensions)
