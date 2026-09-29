@@ -53,6 +53,7 @@ body {
 #controls input { width: 58px; padding: 2px 4px; }
 #controls button { padding: 4px 14px; cursor: pointer; }
 #warning { color: #b00; display: none; }
+#stats { color: #555; }
 #pages { padding: 76px 0 48px; }
 .page {
   width: 297mm;
@@ -71,7 +72,8 @@ body {
 .col {
   writing-mode: vertical-rl;
   text-orientation: upright;
-  height: calc(var(--chars) * 1em);
+  /* One extra cell leaves room for hanging punctuation (ぶら下げ). */
+  height: calc((var(--chars) + 1) * 1em);
   width: calc(var(--font-size) * var(--spacing));
   font-size: var(--font-size);
   line-height: 1;
@@ -102,6 +104,7 @@ rt { font-size: .52em; line-height: 1; }
 <body>
 <div id="controls">
   <strong id="filename"></strong>
+  <span id="stats" title="空白・改行・ルビ（読み）・記法記号を除いた文字数"></span>
   <label>1行の文字数 <input id="in-chars" type="number" min="1"></label>
   <label>行間(文字サイズ比) <input id="in-spacing" type="number" step="0.05" min="1"></label>
   <label>1ページ行数 <input id="in-lines" type="number" min="1"></label>
@@ -115,6 +118,25 @@ rt { font-size: .52em; line-height: 1; }
 <script>
 const SOURCE = %%SOURCE_JSON%%;
 const PARAMS = %%PARAMS_JSON%%;
+
+// Kinsoku shori (Japanese line-breaking rules), after JIS X 4051.
+// Characters that must not start a column.
+const HEAD_NG = new Set("、。，．,.・：；？！?!‼⁇⁈⁉ー）」』】〕〉》］｝〙〗｠”’)]}ヽヾゝゞ々〻" +
+                        "ぁぃぅぇぉっゃゅょゎゕゖァィゥェォッャュョヮヵヶㇰㇱㇲㇳㇴㇵㇶㇷㇸㇹㇺㇻㇼㇽㇾㇿ");
+// Characters that must not end a column.
+const TAIL_NG = new Set("（「『【〔〈《［｛〘〖｟“‘([{");
+// Punctuation allowed to hang one cell past the column end (ぶら下げ).
+const HANG = new Set("、。，．,.");
+// Characters that must not be split when doubled (――, ……).
+const INSEP = new Set("―…‥");
+
+const firstCh = (a) => a.t === "ruby" ? a.base[0] : a.ch;
+const lastCh = (a) => a.t === "ruby" ? a.base[a.base.length - 1] : a.ch;
+const cellsOf = (a) => a.t === "ruby" ? a.base.length : 1;
+function badBreak(before, after) {
+  const b = lastCh(before), f = firstCh(after);
+  return HEAD_NG.has(f) || TAIL_NG.has(b) || (b === f && INSEP.has(f));
+}
 
 // Parse Kakuyomu-style notation into atoms.
 //  ｜base《ruby》        explicit ruby
@@ -160,14 +182,34 @@ function render() {
     `@page { size: A4 landscape; margin: ${effYmm}mm ${effXmm}mm; }`;
 
   // Columnize: a column holds at most `chars` cells; newline ends the column.
-  const atoms = parse(SOURCE);
   const cols = [];
   let col = [];
   let cells = 0;
   const flush = () => { cols.push(col); col = []; cells = 0; };
-  for (const a of atoms) {
+  // Break the column before `next`. If that break violates kinsoku, push trailing
+  // atoms out to the next column (追い出し) until the break point is legal.
+  const breakBefore = (next) => {
+    const carry = [];
+    let carried = 0;
+    while (col.length > 1 && badBreak(col[col.length - 1], carry[0] || next)) {
+      const n = cellsOf(col[col.length - 1]);
+      if (carried + n >= chars) break;
+      carry.unshift(col.pop());
+      carried += n;
+    }
+    // No legal break point nearby: keep the original break rather than a huge gap.
+    if (col.length && badBreak(col[col.length - 1], carry[0] || next)) {
+      col.push(...carry);
+      carry.length = 0;
+      carried = 0;
+    }
+    flush();
+    col = carry;
+    cells = carried;
+  };
+  for (const a of ATOMS) {
     if (a.t === "br") { flush(); continue; }
-    if (a.t === "ruby") {
+    if (a.t === "ruby" && a.base.length > chars) {
       // Split oversized ruby bases across columns; the reading stays on the first segment.
       let base = a.base, rt = a.rt;
       while (base.length) {
@@ -179,14 +221,25 @@ function render() {
       }
       continue;
     }
-    if (cells >= chars) flush();
-    col.push(a); cells++;
+    const n = cellsOf(a);
+    if (cells + n > chars) {
+      // Hang one punctuation mark past the column end instead of breaking.
+      if (n === 1 && cells === chars && col.length && HANG.has(a.ch)) {
+        col.push(a); cells++;
+        continue;
+      }
+      // Short ruby words move to the next column whole instead of being split.
+      breakBefore(a);
+    }
+    col.push(a); cells += n;
   }
   if (col.length || cols.length === 0) flush();
 
   const pagesEl = document.getElementById("pages");
   pagesEl.textContent = "";
   const totalPages = Math.ceil(cols.length / linesPerPage);
+  document.getElementById("stats").textContent =
+    `${CHAR_COUNT.toLocaleString()}字 / ${totalPages}ページ`;
   for (let p = 0; p < totalPages; p++) {
     const pageEl = document.createElement("div");
     pageEl.className = "page";
@@ -220,7 +273,15 @@ function render() {
   // Warn if a column is taller than the printable page height.
   const pageHpx = (210 - effYmm * 2) * 3.7795;
   document.getElementById("warning").style.display =
-    chars * fontSize > pageHpx ? "inline" : "none";
+    (chars + 1) * fontSize > pageHpx ? "inline" : "none";
+}
+
+const ATOMS = parse(SOURCE);
+// Count visible characters: ruby bases count, readings/notation/whitespace do not.
+let CHAR_COUNT = 0;
+for (const a of ATOMS) {
+  if (a.t === "ruby") CHAR_COUNT += a.base.length;
+  else if (a.t !== "br" && !/\s/.test(a.ch)) CHAR_COUNT++;
 }
 
 const params = PARAMS;
